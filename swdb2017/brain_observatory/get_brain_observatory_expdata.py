@@ -3,6 +3,7 @@
 import numpy as np
 import os
 import h5py
+import scipy
 
 def get_all_representational_similarity_matrices(BrainObservatoryCache, session_type, 
                     stimulus_type, drive_path, file_name=None, ids=None, 
@@ -65,12 +66,12 @@ def get_all_representational_similarity_matrices(BrainObservatoryCache, session_
     
     #load all experiments of interest
     exps = BrainObservatoryCache.get_experiment_containers(file_name=file_name, ids=ids, 
-                                         targeted_structures=targeted_structures, 
-                                         imaging_depths=imaging_depths, 
-                                         cre_lines=cre_lines, 
-                                         transgenic_lines=transgenic_lines, 
-                                         include_failed=include_failed)
-    
+                                     targeted_structures=targeted_structures, 
+                                     imaging_depths=imaging_depths, 
+                                     cre_lines=cre_lines, 
+                                     transgenic_lines=transgenic_lines, 
+                                     include_failed=include_failed)
+
     #Determine the size of the images of interest
     first_session_id = BrainObservatoryCache.get_ophys_experiments(
                 experiment_container_ids=[exps[0]['id']], 
@@ -80,9 +81,9 @@ def get_all_representational_similarity_matrices(BrainObservatoryCache, session_
     n_stim = images.shape[0]+1
     
     #Loop through the experiments and add the representational similarity matrix to rs
-    rs = np.zeros([n_stim,n_stim,len(exps)])
-    exp_ids = []
+    rs = np.zeros([len(exps),n_stim,n_stim])
     session_ids = []
+    exp_ids = []
     for exp in range(len(exps)):
         
         if exp%20 == 0:
@@ -90,7 +91,7 @@ def get_all_representational_similarity_matrices(BrainObservatoryCache, session_
         
         exp_ids.append(exps[exp]['id'])
         session_id = BrainObservatoryCache.get_ophys_experiments(
-                experiment_container_ids=exp_ids, 
+                experiment_container_ids=[exps[exp]['id']], 
                 session_types = [session_type])[0]['id']
         session_ids.append(session_id)
         
@@ -98,9 +99,20 @@ def get_all_representational_similarity_matrices(BrainObservatoryCache, session_
         analysis_path = os.path.join(drive_path,'ophys_experiment_analysis')
         analysis_file = os.path.join(analysis_path, str(session_id)+ '_' + str(session_type) + '_analysis.h5')
         f = h5py.File(analysis_file, 'r')
-        rs[:,:,exp] = f['analysis']['rep_similarity_ns'].value
+        rs[exp,:,:] = f['analysis']['rep_similarity_ns'].value
         f.close()
         
     return {'representational_similarity': rs, 'experiment_ids': exp_ids, 'session_ids': session_ids}
 
 
+def get_all_images(BrainObservatoryCache, stimuli,session_type, savepath,save_option):
+        first_session_id = BrainObservatoryCache.get_ophys_experiments(stimuli = [stimuli])[0]['id']
+        image_set = BrainObservatoryCache.get_ophys_experiment_data(ophys_experiment_id=first_session_id) 
+        images = image_set.get_stimulus_template(stimuli)
+        if save_option == 1:
+            for i in range(images.shape[0]):
+                savename = 'natural_scene' + str(i+1) + '.jpg'
+                fullfile = os.path.join(savepath,savename)
+                scipy.misc.imsave(fullfile, images[i,:,:])
+        elif save_option == 0:        
+            return images
